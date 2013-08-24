@@ -410,7 +410,34 @@ function testSpecialPropertySplitter() {
     }
 }
 
+function testOverwriteAnimation() {
+    var objectA = {
+        x: 0,
+        y: 0,
+        overwrite: false,
+    };
+
+    Tweener.addTween(objectA, { x: 1, time: 0.1,
+                                transition: "linear",
+                                onOverwrite: function() { objectA.overwrite = true; },
+                                onOverwriteScope: this,
+                              });
+    Tweener.addTween(objectA, { x: 2, time: 0.1,
+                                transition: "linear",
+                              });
+
+    Tweener.addTween(objectA, { y: 2, time: 0.3,
+                                onComplete: function() { Mainloop.quit('testOverwriteAnimation');},
+                              });
+
+
+    Mainloop.run('testOverwriteAnimation');
+
+    with (objectA) {
+        JSUnit.assertEquals("A: x coordinate", 2, x);
+        JSUnit.assertEquals("A: x coordinate", true, overwrite);
+    }
+}
+
 installFrameTicker();
 JSUnit.gjstestRun(this, JSUnit.setUp, JSUnit.tearDown);
-
-
