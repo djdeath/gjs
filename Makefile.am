@@ -43,6 +43,7 @@ nobase_gjs_module_include_HEADERS =	\
 	gi/ns.h	        \
 	gi/object.h	\
 	gi/foreign.h	\
+	gi/fundamental.h	\
 	gi/param.h	\
 	gi/repo.h	\
 	gi/union.h	\
@@ -140,6 +141,7 @@ libgjs_la_SOURCES += \
 	gi/ns.c	\
 	gi/object.c	\
 	gi/foreign.c	\
+	gi/fundamental.c	\
 	gi/param.c	\
 	gi/proxyutils.c	\
         gi/repo.c	\
