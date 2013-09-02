@@ -69,6 +69,21 @@ static struct JSClass gjs_boxed_class;
 
 GJS_DEFINE_PRIV_FROM_JS(Boxed, gjs_boxed_class)
 
+/* #ifdef gjs_debug_lifecycle */
+/* #undef gjs_debug_lifecycle */
+/* #endif */
+/* #define gjs_debug_lifecycle(arg1,args...) g_message(#arg1 ": " args) */
+
+/* #ifdef gjs_debug */
+/* #undef gjs_debug */
+/* #endif */
+/* #define gjs_debug(arg1,args...) g_message(#arg1 ": " args) */
+
+/* #ifdef gjs_debug_jsprop */
+/* #undef gjs_debug_jsprop */
+/* #endif */
+/* #define gjs_debug_jsprop(arg1,args...) g_message(#arg1 ": " args) */
+
 static JSBool
 gjs_define_static_methods(JSContext    *context,
                           JSObject     *constructor,
