@@ -48,6 +48,22 @@
 #include <util/hash-x32.h>
 #include <girepository.h>
 
+/* #ifdef gjs_debug_lifecycle */
+/* #undef gjs_debug_lifecycle */
+/* #endif */
+/* #define gjs_debug_lifecycle(arg1,args...) g_message(#arg1 ": " args) */
+
+/* #ifdef gjs_debug */
+/* #undef gjs_debug */
+/* #endif */
+/* #define gjs_debug(arg1,args...) g_message(#arg1 ": " args) */
+
+/* #ifdef gjs_debug_jsprop */
+/* #undef gjs_debug_jsprop */
+/* #endif */
+/* #define gjs_debug_jsprop(arg1,args...) g_message(#arg1 ": " args) */
+
+
 typedef struct {
     GIObjectInfo *info;
     GObject *gobj; /* NULL if we are the prototype and not an instance */
