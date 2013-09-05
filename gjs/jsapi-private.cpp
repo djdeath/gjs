@@ -75,3 +75,149 @@ gjs_error_reporter(JSContext     *context,
 
     g_log(G_LOG_DOMAIN, level, "JS %s: [%s %d]: %s", warning, report->filename, report->lineno, message);
 }
+
+/* ArrayBuffer */
+
+gboolean
+gjs_is_array_buffer_object(JSContext *context,
+                           JSObject  *object)
+{
+    return JS_IsArrayBufferObject(object, context) != JS_FALSE;
+}
+
+gpointer
+gjs_array_buffer_get_data(JSContext *context,
+                          JSObject  *object)
+{
+    return (gpointer) JS_GetArrayBufferData(object, context);
+}
+
+gsize
+gjs_array_buffer_get_length(JSContext *context,
+                            JSObject  *object)
+{
+    return JS_GetArrayBufferByteLength(object, context);
+}
+
+/* TypedArray */
+
+gboolean
+gjs_is_typed_array_object(JSContext *context,
+                          JSObject  *object)
+{
+    return JS_IsTypedArrayObject(object, context) != JS_FALSE;
+}
+
+gpointer
+gjs_typed_array_get_int8_data(JSContext *context,
+                              JSObject  *object)
+{
+    return (gpointer) JS_GetInt8ArrayData(object, context);
+}
+
+gpointer
+gjs_typed_array_get_uint8_data(JSContext *context,
+                               JSObject  *object)
+{
+    return (gpointer) JS_GetUint8ArrayData(object, context);
+}
+
+gpointer
+gjs_typed_array_get_int16_data(JSContext *context,
+                               JSObject  *object)
+{
+    return (gpointer) JS_GetInt16ArrayData(object, context);
+}
+
+gpointer
+gjs_typed_array_get_uint16_data(JSContext *context,
+                                JSObject  *object)
+{
+    return (gpointer) JS_GetUint16ArrayData(object, context);
+}
+
+gpointer
+gjs_typed_array_get_int32_data(JSContext *context,
+                               JSObject  *object)
+{
+    return (gpointer) JS_GetInt32ArrayData(object, context);
+}
+
+gpointer
+gjs_typed_array_get_uint32_data(JSContext *context,
+                                JSObject  *object)
+{
+    return (gpointer) JS_GetUint32ArrayData(object, context);
+}
+
+gpointer
+gjs_typed_array_get_float_data(JSContext *context,
+                               JSObject  *object)
+{
+    return (gpointer) JS_GetFloat32ArrayData(object, context);
+}
+
+gpointer
+gjs_typed_array_get_double_data(JSContext *context,
+                                JSObject  *object)
+{
+    return (gpointer) JS_GetFloat64ArrayData(object, context);
+}
+
+gsize
+gjs_typed_array_get_length(JSContext *context,
+                           JSObject  *object)
+{
+    return (gsize) JS_GetTypedArrayLength(object, context);
+}
+
+gboolean
+gjs_typed_array_is_compatible(JSContext *context,
+                              JSObject  *object,
+                              guint      size,
+                              gboolean   is_signed,
+                              gboolean   floating)
+{
+    JSBool ret = JS_FALSE;
+
+    if (floating) {
+        switch (size) {
+        case 32:
+            ret = JS_IsFloat32Array(object, context);
+            break;
+
+        case 64:
+            ret = JS_IsFloat64Array(object, context);
+            break;
+
+        default:
+            break;
+        }
+
+    } else {
+        switch (size) {
+        case 8:
+            ret = is_signed ?
+                JS_IsInt8Array(object, context) :
+            JS_IsUint8Array(object, context);
+            break;
+
+        case 16:
+            ret = is_signed ?
+                JS_IsInt16Array(object, context) :
+            JS_IsUint16Array(object, context);
+            break;
+
+        case 32:
+            ret = is_signed ?
+                JS_IsInt32Array(object, context) :
+            JS_IsUint32Array(object, context);
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    return ret != JS_FALSE;
+}

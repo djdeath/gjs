@@ -115,6 +115,50 @@ function testCArray() {
     GIMarshallingTests.array_in_guint8_len(array);
 }
 
+function testArrayBuffer() {
+    var array, sum;
+
+    let getArrayBuffer = function(indices) {
+        let buffer = new ArrayBuffer(4 * indices.length);
+        let int32View = new Int32Array(buffer);
+        for (let i in indices)
+            int32View[i] = indices[i];
+        return int32View;
+    };
+
+    log('plop1');
+    array = GIMarshallingTests.array_inout(getArrayBuffer([-1, 0, 1, 2]));
+    log('plop1.2');
+    assertEquals(5, array.length);
+    assertEquals(-2, array[0]);
+    assertEquals(-1, array[1]);
+    assertEquals(0, array[2]);
+    assertEquals(1, array[3]);
+    assertEquals(2, array[4]);
+
+    log('plop2');
+    [array, sum] = GIMarshallingTests.array_inout_etc(9,
+                                                      getArrayBuffer([-1, 0, 1, 2]),
+                                                      5);
+    log('plop2.2');
+    assertEquals(14, sum);
+    assertEquals(5, array.length);
+    assertEquals(9, array[0]);
+    assertEquals(-1, array[1]);
+    assertEquals(0, array[2]);
+    assertEquals(1, array[3]);
+    assertEquals(5, array[4]);
+
+    log('plop3');
+    array = getArrayBuffer([-1, 0, 1, 2]);
+    log('plop3.2');
+    GIMarshallingTests.array_in(array);
+    GIMarshallingTests.array_in_len_before(array);
+    GIMarshallingTests.array_in_len_zero_terminated(array);
+    GIMarshallingTests.array_in_guint64_len(array);
+    GIMarshallingTests.array_in_guint8_len(array);
+}
+
 function testGArray() {
     var array;
     array = GIMarshallingTests.garray_int_none_return();

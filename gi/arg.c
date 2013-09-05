@@ -965,6 +965,142 @@ gjs_array_to_array(JSContext   *context,
     }
 }
 
+static JSBool
+gjs_array_buffer_to_array(JSContext   *context,
+                          jsval        array_value,
+                          GITransfer   transfer,
+                          GITypeInfo  *param_info,
+                          void       **arrayp,
+                          gsize       *lengthp)
+{
+    JSObject *array_obj = JSVAL_TO_OBJECT(array_value);
+
+    *arrayp = gjs_array_buffer_get_data(context, array_obj);
+    *lengthp = gjs_array_buffer_get_length(context, array_obj);
+
+    return JS_TRUE;
+}
+
+static gboolean
+_get_type_tag_specs (GITypeTag  type,
+                     guint     *size,
+                     gboolean  *is_signed,
+                     gboolean  *is_floating)
+{
+    switch (type) {
+    case GI_TYPE_TAG_INT8:
+        *size = sizeof(gint8) * 8;
+        *is_signed = TRUE;
+        *is_floating = FALSE;
+        return TRUE;
+    case GI_TYPE_TAG_UINT8:
+        *size = sizeof(guint8) * 8;
+        *is_signed = FALSE;
+        *is_floating = FALSE;
+        return TRUE;
+    case GI_TYPE_TAG_INT16:
+        *size = sizeof(gint16) * 8;
+        *is_signed = TRUE;
+        *is_floating = FALSE;
+        return TRUE;
+    case GI_TYPE_TAG_UINT16:
+        *size = sizeof(guint16) * 8;
+        *is_signed = FALSE;
+        *is_floating = FALSE;
+        return TRUE;
+    case GI_TYPE_TAG_INT32:
+        *size = sizeof(gint32) * 8;
+        *is_signed = TRUE;
+        *is_floating = FALSE;
+        return TRUE;
+    case GI_TYPE_TAG_UINT32:
+        *size = sizeof(guint32) * 8;
+        *is_signed = FALSE;
+        *is_floating = FALSE;
+        return TRUE;
+    case GI_TYPE_TAG_FLOAT:
+        *size = sizeof(gfloat) * 8;
+        *is_signed = TRUE;
+        *is_floating = TRUE;
+        return TRUE;
+    case GI_TYPE_TAG_DOUBLE:
+        *size = sizeof(gdouble) * 8;
+        *is_signed = TRUE;
+        *is_floating = TRUE;
+        return TRUE;
+
+    default:
+        return FALSE;
+    }
+}
+
+static JSBool
+gjs_typed_array_to_array(JSContext   *context,
+                         jsval        array_value,
+                         GITransfer   transfer,
+                         GITypeInfo  *param_info,
+                         void       **arrayp,
+                         gsize       *lengthp)
+{
+    JSObject *array_obj = JSVAL_TO_OBJECT(array_value);
+    GITypeTag element_type = g_type_info_get_tag(param_info);
+    guint size;
+    gboolean is_signed, is_floating;
+
+    if (!_get_type_tag_specs(element_type, &size, &is_signed, &is_floating)) {
+        gjs_throw(context,
+                  "Unhandled array element type %s for a TypedArray",
+                  g_type_tag_to_string (element_type));
+        return JS_FALSE;
+    }
+    if (!gjs_typed_array_is_compatible(context, array_obj, size,
+                                       is_signed, is_floating)) {
+        gjs_throw(context,
+                  "Unhandled array element type %s for a TypedArray "
+                  "(size=%u,signed=%i,floating=%i)",
+                  g_type_tag_to_string (element_type),
+                  size, is_signed, is_floating);
+        return JS_FALSE;
+    }
+
+    switch (element_type) {
+    case GI_TYPE_TAG_INT8:
+        *arrayp = gjs_typed_array_get_int8_data(context, array_obj);
+        break;
+    case GI_TYPE_TAG_UINT8:
+        *arrayp = gjs_typed_array_get_uint8_data(context, array_obj);
+        break;
+    case GI_TYPE_TAG_INT16:
+        *arrayp = gjs_typed_array_get_int16_data(context, array_obj);
+        break;
+    case GI_TYPE_TAG_UINT16:
+        *arrayp = gjs_typed_array_get_uint16_data(context, array_obj);
+        break;
+    case GI_TYPE_TAG_INT32:
+        *arrayp = gjs_typed_array_get_int32_data(context, array_obj);
+        break;
+    case GI_TYPE_TAG_UINT32:
+        *arrayp = gjs_typed_array_get_uint32_data(context, array_obj);
+        break;
+    case GI_TYPE_TAG_FLOAT:
+        *arrayp = gjs_typed_array_get_float_data(context, array_obj);
+        break;
+    case GI_TYPE_TAG_DOUBLE:
+        *arrayp = gjs_typed_array_get_double_data(context, array_obj);
+        break;
+
+    default:
+        gjs_throw(context,
+                  "Unhandled array element type %s for a TypedArray",
+                  g_type_tag_to_string (element_type));
+        return JS_FALSE;
+    }
+
+    *lengthp = gjs_typed_array_get_length(context, array_obj);
+
+    return JS_TRUE;
+}
+
 static GArray*
 gjs_g_array_new_for_type(JSContext    *context,
                          unsigned int  length,
@@ -1124,6 +1260,23 @@ gjs_array_to_explicit_array_internal(JSContext       *context,
         /* Allow strings as int8/uint8/int16/uint16 arrays */
         if (!gjs_string_to_intarray(context, value, param_info,
                                     contents, length_p))
+            goto out;
+    } else if (gjs_is_array_buffer_object(context, JSVAL_TO_OBJECT(value))) {
+        if (!gjs_array_buffer_to_array(context,
+                                       value,
+                                       transfer,
+                                       param_info,
+                                       contents,
+                                       length_p))
+            goto out;
+
+    } else if (gjs_is_typed_array_object(context, JSVAL_TO_OBJECT(value))) {
+        if (!gjs_typed_array_to_array (context,
+                                       value,
+                                       transfer,
+                                       param_info,
+                                       contents,
+                                       length_p))
             goto out;
     } else if (JS_HasPropertyById(context, JSVAL_TO_OBJECT(value), length_name, &found_length) &&
                found_length) {
@@ -1695,7 +1848,7 @@ gjs_value_to_g_argument(JSContext      *context,
         break;
 
     case GI_TYPE_TAG_ARRAY: {
-        gpointer data;
+        gpointer data = NULL;
         gsize length;
         GIArrayType array_type = g_type_info_get_array_type(type_info);
         GITypeTag element_type;
@@ -1709,23 +1862,24 @@ gjs_value_to_g_argument(JSContext      *context,
         /* First, let's handle the case where we're passed an instance
          * of our own byteArray class.
          */
-        if (JSVAL_IS_OBJECT(value) &&
-            gjs_typecheck_bytearray(context,
-                                    JSVAL_TO_OBJECT(value),
-                                    FALSE))
-            {
-                JSObject *bytearray_obj = JSVAL_TO_OBJECT(value);
+        if (JSVAL_IS_OBJECT(value)) {
+            JSObject *array_obj = JSVAL_TO_OBJECT(value);
+
+            if (gjs_typecheck_bytearray(context,
+                                        array_obj,
+                                        FALSE)) {
                 if (array_type == GI_ARRAY_TYPE_BYTE_ARRAY) {
-                    arg->v_pointer = gjs_byte_array_get_byte_array(context, bytearray_obj);
+                    arg->v_pointer = gjs_byte_array_get_byte_array(context, array_obj);
                     break;
-                } else if (array_type == GI_ARRAY_TYPE_C && 
+                } else if (array_type == GI_ARRAY_TYPE_C &&
                            (element_type == GI_TYPE_TAG_UINT8 || element_type == GI_TYPE_TAG_INT8)) {
-                    gjs_byte_array_peek_data(context, bytearray_obj, (guint8**) &data, &length);
+                    gjs_byte_array_peek_data(context, array_obj, (guint8**) &data, &length);
                     bytearray_fastpath = TRUE;
                 } else {
                     /* Fall through, !handled */
                 }
             }
+        }
 
         if (!bytearray_fastpath &&
             !gjs_array_to_explicit_array_internal(context,
