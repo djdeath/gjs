@@ -368,6 +368,40 @@ void              gjs_unroot_value_locations  (JSContext        *context,
                                                jsval            *locations,
                                                int               n_locations);
 
+gboolean          gjs_is_array_buffer_object  (JSContext        *context,
+                                               JSObject         *object);
+gpointer          gjs_array_buffer_get_data   (JSContext        *context,
+                                               JSObject         *object);
+gsize             gjs_array_buffer_get_length (JSContext        *context,
+                                               JSObject         *object);
+
+gboolean          gjs_is_typed_array_object   (JSContext        *context,
+                                               JSObject         *object);
+
+gpointer          gjs_typed_array_get_int8_data   (JSContext    *context,
+                                                   JSObject     *object);
+gpointer          gjs_typed_array_get_uint8_data  (JSContext    *context,
+                                                   JSObject     *object);
+gpointer          gjs_typed_array_get_int16_data  (JSContext    *context,
+                                                   JSObject     *object);
+gpointer          gjs_typed_array_get_uint16_data (JSContext    *context,
+                                                   JSObject     *object);
+gpointer          gjs_typed_array_get_int32_data  (JSContext    *context,
+                                                   JSObject     *object);
+gpointer          gjs_typed_array_get_uint32_data (JSContext    *context,
+                                                   JSObject     *object);
+gpointer          gjs_typed_array_get_float_data  (JSContext    *context,
+                                                   JSObject     *object);
+gpointer          gjs_typed_array_get_double_data (JSContext    *context,
+                                                   JSObject     *object);
+gsize             gjs_typed_array_get_length      (JSContext    *context,
+                                                   JSObject     *object);
+gboolean          gjs_typed_array_is_compatible   (JSContext    *context,
+                                                   JSObject     *object,
+                                                   guint         size,
+                                                   gboolean      is_signed,
+                                                   gboolean      floating);
+
 /* Functions intended for more "internal" use */
 
 void gjs_maybe_gc (JSContext *context);
