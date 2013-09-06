@@ -43,6 +43,9 @@ JSBool    gjs_typecheck_object          (JSContext     *context,
                                          JSObject      *obj,
                                          GType          expected_type,
                                          JSBool         throw);
+JSBool    gjs_typecheck_is_object       (JSContext     *context,
+                                         JSObject      *obj,
+                                         JSBool         throw);
 
 void      gjs_object_process_pending_toggles (void);
 

@@ -2049,6 +2049,26 @@ gjs_g_object_from_object(JSContext    *context,
 }
 
 JSBool
+gjs_typecheck_is_object(JSContext     *context,
+                        JSObject      *object,
+                        JSBool         throw)
+{
+
+    if (do_base_typecheck(context, object, throw)) {
+        ObjectInstance *priv = priv_from_js(context, object);
+
+        if (priv)
+            return JS_TRUE;
+    }
+
+    if (throw)
+        gjs_throw(context,
+                  "Object instance or prototype is not a GObject");
+
+    return JS_FALSE;
+}
+
+JSBool
 gjs_typecheck_object(JSContext     *context,
                      JSObject      *object,
                      GType          expected_type,
