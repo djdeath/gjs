@@ -44,6 +44,8 @@
 #include <gjs/type-module.h>
 #include <gjs/runtime.h>
 
+#include "libgjs-private/gjs-memory.h"
+
 #include <util/log.h>
 #include <util/hash-x32.h>
 #include <girepository.h>
@@ -76,6 +78,9 @@ typedef struct {
     /* the GObjectClass wrapped by this JS Object (only used for
        prototypes) */
     GTypeClass *klass;
+
+
+    gchar *location;
 } ObjectInstance;
 
 typedef struct {
@@ -105,6 +110,7 @@ enum {
 
 static GSList *object_init_list;
 static GHashTable *class_init_properties;
+static GHashTable *object_classes;
 
 static struct JSClass gjs_object_instance_class;
 static GThread *gjs_eval_thread;
@@ -121,6 +127,161 @@ typedef enum {
     NO_SUCH_G_PROPERTY,
     VALUE_WAS_SET
 } ValueFromPropertyResult;
+
+static GHashTable *
+objects_ensure_hashtable (void)
+{
+    if (G_UNLIKELY (object_classes == NULL))
+        object_classes = g_hash_table_new (g_str_hash, g_str_equal);
+
+    return object_classes;
+}
+
+static GHashTable *
+objects_gtype_ensure_hashtable (GType gtype)
+{
+    const gchar *type_name = g_type_name (gtype);
+    GHashTable *gtype_table;
+    GHashTable *table;
+
+    gtype_table = objects_ensure_hashtable ();
+
+    table = g_hash_table_lookup (gtype_table, (gpointer) type_name);
+    if (G_UNLIKELY (table == NULL)) {
+        table = g_hash_table_new (g_direct_hash, g_direct_equal);
+        g_hash_table_insert (gtype_table, (gpointer) type_name, table);
+    }
+
+    return table;
+}
+
+static void
+object_inc_gtype (JSObject *object, ObjectInstance *priv, JSContext *context)
+{
+    GHashTable *table = objects_gtype_ensure_hashtable (priv->gtype);
+    jsval fileName, lineNumber;
+
+    g_hash_table_insert (table, object, priv);
+
+    if (gjs_context_get_frame_info (context, NULL, &fileName, &lineNumber)) {
+        gchar *sfileName = NULL;
+
+        gjs_string_to_filename (context, fileName, &sfileName);
+
+        if (sfileName)
+            priv->location = g_strdup_printf ("%s:%i", sfileName, JSVAL_TO_INT (lineNumber));
+
+        if (sfileName)
+            g_free (sfileName);
+    }
+
+    JS_ClearPendingException (context);
+}
+
+static void
+object_dec_gtype (JSObject *object, ObjectInstance *priv)
+{
+    GHashTable *table = objects_gtype_ensure_hashtable (priv->gtype);
+
+    g_hash_table_remove (table, object);
+}
+
+static void
+_memory_object_free (gpointer data)
+{
+    g_boxed_free (GJS_TYPE_MEMORY_OBJECT, data);
+}
+
+static void
+_memory_object_count_free (gpointer data)
+{
+    g_boxed_free (GJS_TYPE_MEMORY_OBJECT_COUNT, data);
+}
+
+GPtrArray *
+gjs_object_get_instances (const gchar *name)
+{
+    GType gtype = g_type_from_name (name);
+
+    if (gtype != G_TYPE_INVALID) {
+        const gchar *type_name = g_type_name (gtype);
+        GHashTable *table = objects_gtype_ensure_hashtable (gtype);
+        GHashTableIter iter;
+        gpointer key, val;
+        GPtrArray *array = g_ptr_array_new_full (g_hash_table_size (table),
+                                                 _memory_object_free);
+
+        g_hash_table_iter_init (&iter, table);
+        while (g_hash_table_iter_next (&iter, &key, &val)) {
+            JSObject *object =  (JSObject *) key;
+            ObjectInstance *priv = (ObjectInstance *) val;
+            g_ptr_array_add (array,
+                             gjs_memory_object_new (type_name,
+                                                    gtype,
+                                                    priv->location,
+                                                    (gulong) object));
+        }
+
+        return array;
+    }
+
+    return NULL;
+}
+
+GPtrArray *
+gjs_object_get_instances_count (void)
+{
+    GHashTable *table = objects_ensure_hashtable ();
+    GHashTableIter iter;
+    gpointer key, val;
+    GPtrArray *array = g_ptr_array_new_full (g_hash_table_size (table),
+                                             _memory_object_count_free);
+
+    g_hash_table_iter_init (&iter, table);
+    while (g_hash_table_iter_next (&iter, &key, &val)) {
+        g_ptr_array_add (array,
+                         gjs_memory_object_count_new ((const gchar *) key,
+                                                      g_type_from_name ((const gchar *) key),
+                                                      g_hash_table_size ((GHashTable *) val)));
+    }
+
+    return array;
+}
+
+void
+gjs_object_print_instances (const gchar *name)
+{
+    if (object_classes) {
+        GType gtype = g_type_from_name (name);
+
+        g_print ("Gjs %s objects locations\n", name);
+        if (gtype != G_TYPE_INVALID) {
+            GHashTable *table = objects_gtype_ensure_hashtable (gtype);
+            GHashTableIter iter;
+            gpointer key;
+
+            g_hash_table_iter_init (&iter, table);
+            while (g_hash_table_iter_next (&iter, &key, NULL)) {
+                ObjectInstance *priv = (ObjectInstance *) key;
+                g_print ("\t%p: %s\n", priv, priv->location);
+            }
+        }
+    }
+}
+
+void
+gjs_object_print_instances_count (void)
+{
+    GHashTable *table = objects_ensure_hashtable ();
+    GHashTableIter iter;
+    gpointer key, val;
+
+    g_print ("Gjs object instances\n");
+    g_hash_table_iter_init (&iter, table);
+    while (g_hash_table_iter_next (&iter, &key, &val)) {
+        g_print ("\t%s: %i\n", (gchar *) key, g_hash_table_size ((GHashTable *) val));
+    }
+}
 
 static GQuark
 gjs_is_custom_type_quark (void)
@@ -1140,6 +1301,7 @@ associate_js_gobject (JSContext      *context,
 
     priv = priv_from_js(context, object);
     priv->gobj = gobj;
+    object_inc_gtype (object, priv, context);
 
     g_assert(peek_js_obj(gobj) == NULL);
     set_js_obj(gobj, object);
@@ -1341,6 +1503,8 @@ object_instance_finalize(JSFreeOp  *fop,
                                     priv->info ? g_base_info_get_name((GIBaseInfo*) priv->info) : g_type_name(priv->gtype)));
 
     if (priv->gobj) {
+        object_dec_gtype (obj, priv);
+
         invalidate_all_signals (priv);
 
         if (G_UNLIKELY (priv->gobj->ref_count <= 0)) {
@@ -1356,6 +1520,9 @@ object_instance_finalize(JSFreeOp  *fop,
                     priv->info ? g_base_info_get_namespace((GIBaseInfo*) priv->info) : "",
                     priv->info ? g_base_info_get_name((GIBaseInfo*) priv->info) : g_type_name(priv->gtype));
         }
+
+        if (priv->location)
+            g_free (priv->location);
 
         set_js_obj(priv->gobj, NULL);
         g_object_remove_toggle_ref(priv->gobj, wrapped_gobj_toggle_notify,
@@ -1562,7 +1729,7 @@ real_connect_func(JSContext *context,
         g_signal_handler_disconnect(priv->gobj, id);
         goto out;
     }
-    
+
     JS_SET_RVAL(context, vp, retval);
 
     ret = JS_TRUE;
@@ -1625,7 +1792,7 @@ disconnect_func(JSContext *context,
     id = JSVAL_TO_INT(argv[0]);
 
     g_signal_handler_disconnect(priv->gobj, id);
-    
+
     JS_SET_RVAL(context, vp, JSVAL_VOID);
 
     return JS_TRUE;
@@ -1773,7 +1940,7 @@ to_string_func(JSContext *context,
         throw_priv_is_null_error(context);
         goto out;  /* wrong class passed in */
     }
-    
+
     if (!_gjs_proxy_to_string_func(context, obj, "object", (GIBaseInfo*)priv->info,
                                    priv->gtype, priv->gobj, &retval))
         goto out;
@@ -1801,7 +1968,7 @@ static struct JSClass gjs_object_instance_class = {
     NULL,
     NULL,
     object_instance_trace,
-    
+
 };
 
 static JSBool
@@ -2413,7 +2580,7 @@ gjs_object_class_init(GObjectClass *class,
             g_param_spec_set_qdata(pspec, gjs_is_custom_property_quark(), GINT_TO_POINTER(1));
             g_object_class_install_property (class, i+1, pspec);
         }
-        
+
         gjs_hash_table_for_gsize_remove (class_init_properties, gtype);
     }
 }

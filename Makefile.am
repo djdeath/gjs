@@ -155,6 +155,8 @@ libgjs_la_SOURCES += \
 libgjs_private_source_files = \
 	libgjs-private/gjs-gdbus-wrapper.c	\
 	libgjs-private/gjs-gdbus-wrapper.h	\
+	libgjs-private/gjs-memory.c		\
+	libgjs-private/gjs-memory.h		\
 	libgjs-private/gjs-util.c		\
 	libgjs-private/gjs-util.h
 libgjs_la_SOURCES += $(libgjs_private_source_files)

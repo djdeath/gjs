@@ -49,6 +49,12 @@ JSBool    gjs_typecheck_is_object       (JSContext     *context,
 
 void      gjs_object_process_pending_toggles (void);
 
+void      gjs_object_print_instances (const gchar *name);
+void      gjs_object_print_instances_count (void);
+
+GPtrArray *gjs_object_get_instances (const gchar *name);
+GPtrArray *gjs_object_get_instances_count (void);
+
 G_END_DECLS
 
 #endif  /* __GJS_OBJECT_H__ */

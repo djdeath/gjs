@@ -15,7 +15,8 @@ dist_gjsjs_DATA +=		\
 	modules/jsUnit.js	\
 	modules/signals.js	\
 	modules/promise.js	\
-	modules/format.js
+	modules/format.js	\
+	modules/memory.js
 
 NATIVE_MODULES = libconsole.la libsystem.la
 if ENABLE_CAIRO
