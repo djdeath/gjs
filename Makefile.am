@@ -221,6 +221,12 @@ install-exec-hook:
 include Makefile-test.am
 include Makefile-insttest.am
 
+########################################################################
+jsobjdump_files = \
+	util/ObjDump.js	\
+	util/ObjDump.ui
+
+EXTRA_DIST += $(jsobjdump_files)
 EXTRA_DIST += autogen.sh COPYING.LGPL
 
 # Colin's handy Makefile bits for:
